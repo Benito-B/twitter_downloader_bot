@@ -3,7 +3,7 @@ import json
 import logging
 import traceback
 from io import StringIO
-from os import makedirs
+from os import makedirs, getenv
 from tempfile import TemporaryFile
 from typing import Optional
 from urllib.parse import urlsplit
@@ -18,12 +18,12 @@ import telegram.error
 from telegram import Update, InputMediaDocument, InputMediaAnimation, constants, BotCommand, BotCommandScopeChat
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, PicklePersistence
 
-from config import BOT_TOKEN, DEVELOPER_ID, IS_BOT_PRIVATE
-
 # Enable logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
-
+# Grab env values
+BOT_TOKEN = getenv('BOT_TOKEN')
+DEVELOPER_ID = getenv('DEVELOPER_ID')
 
 def extract_tweet_ids(update: Update) -> Optional[list[str]]:
     """Extract tweet IDs from message."""
@@ -296,46 +296,24 @@ def main() -> None:
 
     dispatcher.add_handler(CommandHandler("stats", stats_command, Filters.chat(DEVELOPER_ID)))
     dispatcher.add_handler(CommandHandler("resetstats", reset_stats_command, Filters.chat(DEVELOPER_ID)))
+    # on different commands - answer in Telegram
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
 
-    if IS_BOT_PRIVATE:
-        # Deny access to everyone but developer
-        dispatcher.add_handler(MessageHandler(~Filters.chat(DEVELOPER_ID), deny_access))
+    # on non command i.e message - handle the message
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message, run_async=True))
 
-        # on different commands - answer in Telegram
-        dispatcher.add_handler(CommandHandler("start", start, Filters.chat(DEVELOPER_ID)))
-        dispatcher.add_handler(CommandHandler("help", help_command, Filters.chat(DEVELOPER_ID)))
-
-        # on non command i.e message - handle the message
-        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command & Filters.chat(DEVELOPER_ID),
-                                              handle_message, run_async=True))
-
-        # Set commands menu
-        commands = [BotCommand("start", "Start the bot"), BotCommand("help", "Help message"),
-                    BotCommand("stats", "Get bot statistics"), BotCommand("resetstats", "Reset bot statistics")]
-        try:
-            bot.set_my_commands(commands, scope=BotCommandScopeChat(DEVELOPER_ID))
-        except telegram.error.BadRequest as exc:
-            logger.warning(f"Couldn't set my commands for developer chat: {exc.message}")
-
-    else:
-        # on different commands - answer in Telegram
-        dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("help", help_command))
-
-        # on non command i.e message - handle the message
-        dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_message, run_async=True))
-
-        # Set commands menu
-        # Public commands are useless for now
-        # public_commands = [BotCommand("start", "Start the bot"), BotCommand("help", "Help message")]
-        public_commands = []
-        dev_commands = public_commands + [BotCommand("stats", "Get bot statistics"),
-                                          BotCommand("resetstats", "Reset bot statistics")]
-        bot.set_my_commands(public_commands)
-        try:
-            bot.set_my_commands(dev_commands, scope=BotCommandScopeChat(DEVELOPER_ID))
-        except telegram.error.BadRequest as exc:
-            logger.warning(f"Couldn't set my commands for developer chat: {exc.message}")
+    # Set commands menu
+    # Public commands are useless for now
+    # public_commands = [BotCommand("start", "Start the bot"), BotCommand("help", "Help message")]
+    public_commands = []
+    dev_commands = public_commands + [BotCommand("stats", "Get bot statistics"),
+                                      BotCommand("resetstats", "Reset bot statistics")]
+    bot.set_my_commands(public_commands)
+    try:
+        bot.set_my_commands(dev_commands, scope=BotCommandScopeChat(DEVELOPER_ID))
+    except telegram.error.BadRequest as exc:
+        logger.warning(f"Couldn't set my commands for developer chat: {exc.message}")
 
     dispatcher.add_error_handler(error_handler)
 
