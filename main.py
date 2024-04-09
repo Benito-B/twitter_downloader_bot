@@ -161,6 +161,11 @@ async def grab_command(update: Update, context: CallbackContext) -> None:
     increase_context_counter(context, "commands_handled")
 
 
+async def donate_command(update: Update, context: CallbackContext) -> None:
+    await update.effective_message.reply_text("If you like the bot and want to support me, please buy me a coffee!" +
+                                              'https://www.buymeacoffee.com/benitob')
+
+
 async def command_send_videos(context: CallbackContext, videos: list, update: Update) -> None:
     for video in videos:
         video_url = video['url']
@@ -349,6 +354,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stats", stats_command, filters.Chat(int(DEVELOPER_ID))))
     application.add_handler(CommandHandler("resetstats", reset_stats_command, filters.Chat(int(DEVELOPER_ID))))
+    application.add_handler(CommandHandler("donate", donate_command))
 
     # on inline queries - show corresponding inline results
     application.add_handler(InlineQueryHandler(inline_query, CORRECT_TWITTER_PATTERN))
